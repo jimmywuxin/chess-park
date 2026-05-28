@@ -66,8 +66,14 @@ class ChessBoardWidget extends StatelessWidget {
             ),
             child: CustomPaint(
               painter: _BoardPainter(cellSize: cellSize),
-              child: Stack(
-                children: _buildPieces(cellSize, pieceSize),
+              child: _PieceStack(
+                board: board,
+                selectedPiece: selectedPiece,
+                legalMoves: legalMoves,
+                lastMove: lastMove,
+                cellSize: cellSize,
+                pieceSize: pieceSize,
+                posToPixel: _posToPixel,
               ),
             ),
           ),
@@ -75,13 +81,109 @@ class ChessBoardWidget extends StatelessWidget {
       },
     );
   }
+}
 
-  List<Widget> _buildPieces(double cellSize, double pieceSize) {
+class _PieceStack extends StatefulWidget {
+  final ChessBoard board;
+  final Position? selectedPiece;
+  final List<Position> legalMoves;
+  final MoveRecord? lastMove;
+  final double cellSize;
+  final double pieceSize;
+  final Offset Function(Position, double) posToPixel;
+
+  const _PieceStack({
+    required this.board,
+    required this.selectedPiece,
+    required this.legalMoves,
+    required this.lastMove,
+    required this.cellSize,
+    required this.pieceSize,
+    required this.posToPixel,
+  });
+
+  @override
+  State<_PieceStack> createState() => _PieceStackState();
+}
+
+class _PieceStackState extends State<_PieceStack>
+    with TickerProviderStateMixin {
+  // 两个独立的 controller，避免动态创建销毁
+  late final AnimationController _playerAnimCtrl;
+  late final AnimationController _aiAnimCtrl;
+  Animation<Offset>? _animPosition;
+  Position? _animatingTo;
+
+  @override
+  void initState() {
+    super.initState();
+    _playerAnimCtrl = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    )..addStatusListener(_onAnimComplete);
+    _aiAnimCtrl = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..addStatusListener(_onAnimComplete);
+  }
+
+  void _onAnimComplete(AnimationStatus status) {
+    if (status == AnimationStatus.completed && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _animatingTo = null;
+            _animPosition = null;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(_PieceStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.lastMove != null &&
+        (oldWidget.lastMove == null ||
+         oldWidget.lastMove!.from != widget.lastMove!.from ||
+         oldWidget.lastMove!.to != widget.lastMove!.to)) {
+      final from = widget.lastMove!.from;
+      final to = widget.lastMove!.to;
+      final isAi = widget.lastMove!.isAiMove;
+      final ctrl = isAi ? _aiAnimCtrl : _playerAnimCtrl;
+
+      // 停止另一个 controller
+      (isAi ? _playerAnimCtrl : _aiAnimCtrl).stop();
+
+      _animatingTo = to;
+      _animPosition = Tween<Offset>(
+        begin: widget.posToPixel(from, widget.cellSize),
+        end: widget.posToPixel(to, widget.cellSize),
+      ).animate(CurvedAnimation(
+        parent: ctrl,
+        curve: Curves.easeOutCubic,
+      ));
+      ctrl.reset();
+      ctrl.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _playerAnimCtrl.dispose();
+    _aiAnimCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final widgets = <Widget>[];
+    final cellSize = widget.cellSize;
+    final pieceSize = widget.pieceSize;
 
     // 合法走法指示
-    for (final pos in legalMoves) {
-      final pixel = _posToPixel(pos, cellSize);
+    for (final pos in widget.legalMoves) {
+      final pixel = widget.posToPixel(pos, cellSize);
       widgets.add(Positioned(
         left: pixel.dx - pieceSize / 2,
         top: pixel.dy - pieceSize / 2,
@@ -97,12 +199,11 @@ class ChessBoardWidget extends StatelessWidget {
     }
 
     // 棋子
-    for (final entry in board.pieces.entries) {
+    for (final entry in widget.board.pieces.entries) {
       final pos = entry.key;
       final piece = entry.value;
-      final isSelected = selectedPiece == pos;
-      final pixel = _posToPixel(pos, cellSize);
-      final isAnimating = lastMove != null && lastMove!.to == pos;
+      final isSelected = widget.selectedPiece == pos;
+      final pixel = widget.posToPixel(pos, cellSize);
 
       final pieceWidget = Container(
         width: pieceSize,
@@ -141,13 +242,16 @@ class ChessBoardWidget extends StatelessWidget {
         ),
       );
 
-      if (isAnimating) {
-        final fromPixel = _posToPixel(lastMove!.from, cellSize);
-        widgets.add(_AnimatedPiece(
-          key: ValueKey('anim_${pos.row}_${pos.col}_${DateTime.now().millisecondsSinceEpoch}'),
-          fromPixel: fromPixel,
-          toPixel: pixel,
-          pieceSize: pieceSize,
+      if (_animatingTo == pos && _animPosition != null) {
+        widgets.add(AnimatedBuilder(
+          animation: _animPosition!,
+          builder: (context, child) {
+            return Positioned(
+              left: _animPosition!.value.dx - pieceSize / 2,
+              top: _animPosition!.value.dy - pieceSize / 2,
+              child: child!,
+            );
+          },
           child: pieceWidget,
         ));
       } else {
@@ -159,68 +263,7 @@ class ChessBoardWidget extends StatelessWidget {
       }
     }
 
-    return widgets;
-  }
-}
-
-class _AnimatedPiece extends StatefulWidget {
-  final Offset fromPixel;
-  final Offset toPixel;
-  final double pieceSize;
-  final Widget child;
-
-  const _AnimatedPiece({
-    super.key,
-    required this.fromPixel,
-    required this.toPixel,
-    required this.pieceSize,
-    required this.child,
-  });
-
-  @override
-  State<_AnimatedPiece> createState() => _AnimatedPieceState();
-}
-
-class _AnimatedPieceState extends State<_AnimatedPiece>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _position;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 350),
-      vsync: this,
-    );
-    _position = Tween<Offset>(
-      begin: widget.fromPixel,
-      end: widget.toPixel,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _position,
-      builder: (context, child) {
-        return Positioned(
-          left: _position.value.dx - widget.pieceSize / 2,
-          top: _position.value.dy - widget.pieceSize / 2,
-          child: widget.child,
-        );
-      },
-    );
+    return Stack(children: widgets);
   }
 }
 
@@ -256,7 +299,7 @@ class _BoardPainter extends CustomPainter {
       canvas.drawLine(pt(0, row), pt(8, row), paint);
     }
 
-    // 楚河汉界 — 楚河对齐col2，汉界对齐col5
+    // 楚河汉界
     final riverY = (pt(0, 4).dy + pt(0, 5).dy) / 2;
     final riverStyle = TextStyle(
       color: Colors.brown,
@@ -264,14 +307,12 @@ class _BoardPainter extends CustomPainter {
       fontWeight: FontWeight.bold,
       letterSpacing: cellSize * 0.08,
     );
-    // 楚河居中对齐 col 2（第二个兵）
     final chuTp = TextPainter(
       text: TextSpan(text: '楚 河', style: riverStyle),
       textDirection: TextDirection.ltr,
     )..layout();
     final chuX = pt(2, 0).dx - chuTp.width / 2;
     chuTp.paint(canvas, Offset(chuX, riverY - chuTp.height / 2));
-    // 汉界居中对齐 col 4（第四个兵）
     final hanTp = TextPainter(
       text: TextSpan(text: '汉 界', style: riverStyle),
       textDirection: TextDirection.ltr,

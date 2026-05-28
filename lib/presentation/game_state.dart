@@ -3,14 +3,15 @@ import '../domain/board.dart';
 import '../domain/piece.dart';
 import '../domain/rules.dart';
 import '../data/ai_engine.dart';
+import '../data/opening_book.dart';
 
 enum GamePhase { playerTurn, aiThinking, gameOver }
 
-/// 记录一步棋的起止位置
 class MoveRecord {
   final Position from;
   final Position to;
-  const MoveRecord(this.from, this.to);
+  final bool isAiMove;
+  const MoveRecord(this.from, this.to, {this.isAiMove = false});
 }
 
 class GameState extends ChangeNotifier {
@@ -26,6 +27,7 @@ class GameState extends ChangeNotifier {
   List<ChessBoard> _boardHistory = [];
   List<String> _moveHistory = [];
   MoveRecord? _lastMove;
+  final List<Move> _allMoves = [];
 
   ChessBoard get board => _board;
   PieceColor get playerColor => _playerColor;
@@ -38,6 +40,16 @@ class GameState extends ChangeNotifier {
   int get loseCount => _loseCount;
   List<String> get moveHistory => _moveHistory;
   MoveRecord? get lastMove => _lastMove;
+
+  /// 根据难度返回 (maxDepth, timeLimitMs)
+  (int, int) get _aiParams {
+    switch (_aiDifficulty) {
+      case 1: return (4, 2000);   // 简单：4层，2秒
+      case 2: return (6, 4000);   // 中等：6层，4秒
+      case 3: return (8, 8000);   // 困难：8层，8秒
+      default: return (6, 4000);
+    }
+  }
 
   void selectPiece(Position pos) {
     if (_phase != GamePhase.playerTurn) return;
@@ -64,11 +76,11 @@ class GameState extends ChangeNotifier {
 
     _boardHistory.add(_board.clone());
     _board = result.newBoard;
-    _lastMove = MoveRecord(from, to);
+    _lastMove = MoveRecord(from, to, isAiMove: false);
     _selectedPiece = null;
     _legalMoves = [];
     _moveHistory.add('player: $to');
-    notifyListeners();
+    _allMoves.add(Move(from, to));
 
     if (result.isCheckmate) {
       _phase = GamePhase.gameOver;
@@ -85,16 +97,23 @@ class GameState extends ChangeNotifier {
     _phase = GamePhase.aiThinking;
     notifyListeners();
 
-    Future.delayed(const Duration(milliseconds: 800), () {
+    Future.delayed(const Duration(milliseconds: 500), () {
       _aiMove();
     });
   }
 
   void _aiMove() {
     final aiColor = _playerColor == PieceColor.red ? PieceColor.black : PieceColor.red;
-    final depth = _aiDifficulty == 1 ? 2 : (_aiDifficulty == 2 ? 4 : 5);
-    final ai = AIEngine(maxDepth: depth);
-    final bestMove = ai.findBestMove(_board, aiColor);
+
+    // 先查开局库
+    Move? bestMove = OpeningBook.getNextMove(_allMoves);
+
+    // 开局库没有匹配，用增强 AI 搜索
+    if (bestMove == null) {
+      final (depth, timeMs) = _aiParams;
+      final ai = AIEngine(maxDepth: depth, timeLimitMs: timeMs);
+      bestMove = ai.findBestMove(_board, aiColor);
+    }
 
     if (bestMove == null) {
       _phase = GamePhase.gameOver;
@@ -104,12 +123,27 @@ class GameState extends ChangeNotifier {
       return;
     }
 
+    // 验证走法合法
+    final legalMoves = getLegalMoves(bestMove.from, _board);
+    if (!legalMoves.contains(bestMove.to)) {
+      final (depth, timeMs) = _aiParams;
+      final ai = AIEngine(maxDepth: depth, timeLimitMs: timeMs);
+      bestMove = ai.findBestMove(_board, aiColor);
+      if (bestMove == null) {
+        _phase = GamePhase.gameOver;
+        _message = '你赢了！AI无法移动！';
+        _winCount++;
+        notifyListeners();
+        return;
+      }
+    }
+
     _boardHistory.add(_board.clone());
     final result = makeMove(bestMove.from, bestMove.to, _board);
     _board = result.newBoard;
-    _lastMove = MoveRecord(bestMove.from, bestMove.to);
+    _lastMove = MoveRecord(bestMove.from, bestMove.to, isAiMove: true);
     _moveHistory.add('AI: ${bestMove.from}->${bestMove.to}'.replaceAll(RegExp(r'[()]'), ''));
-    notifyListeners();
+    _allMoves.add(bestMove);
 
     if (result.isCheckmate) {
       _phase = GamePhase.gameOver;
@@ -133,6 +167,10 @@ class GameState extends ChangeNotifier {
     _board = _boardHistory.removeLast();
     _moveHistory.removeLast();
     _moveHistory.removeLast();
+    if (_allMoves.length >= 2) {
+      _allMoves.removeLast();
+      _allMoves.removeLast();
+    }
     _selectedPiece = null;
     _legalMoves = [];
     _lastMove = null;
@@ -150,6 +188,7 @@ class GameState extends ChangeNotifier {
     _moveHistory = [];
     _boardHistory = [];
     _lastMove = null;
+    _allMoves.clear();
     notifyListeners();
   }
 
@@ -165,7 +204,7 @@ class GameState extends ChangeNotifier {
       _phase = GamePhase.aiThinking;
       _message = 'AI先手，思考中...';
       notifyListeners();
-      Future.delayed(const Duration(milliseconds: 800), () {
+      Future.delayed(const Duration(milliseconds: 300), () {
         _aiMove();
       });
     }
