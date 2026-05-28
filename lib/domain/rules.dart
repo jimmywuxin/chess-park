@@ -76,8 +76,8 @@ List<Position> _getElephantMoves(Position from, ChessBoard board, PieceColor col
     final eye = Position(from.row + check[0].row, from.col + check[0].col);
     final to = Position(from.row + check[1].row, from.col + check[1].col);
     if (board.isEmpty(eye) && to.isInsideBoard()) {
-      // 象不过河
-      final inOwnSide = color == PieceColor.red ? to.row <= 4 : to.row >= 5;
+      // 象不过河：红方在下方(row 7-9)，黑方在上方(row 0-4)
+      final inOwnSide = color == PieceColor.red ? to.row >= 5 : to.row <= 4;
       if (inOwnSide) {
         final target = board.getPieceAt(to);
         if (target == null || target.color != color) {
@@ -145,13 +145,13 @@ List<Position> _getCannonMoves(Position from, ChessBoard board, PieceColor color
       if (target == null) {
         moves.add(to);
       } else {
-        // 找到炮架，跳过一子
+        // 找到炮架，跳过一子后找目标
         for (int step2 = step + 1;; step2++) {
-          final jumpTo = Position(from.row + d.row * step2, from.col + d.col * step2);
-          if (!jumpTo.isInsideBoard()) break;
-          final target2 = board.getPieceAt(jumpTo);
+          final to2 = Position(from.row + d.row * step2, from.col + d.col * step2);
+          if (!to2.isInsideBoard()) break;
+          final target2 = board.getPieceAt(to2);
           if (target2 != null) {
-            if (target2.color != color) moves.add(jumpTo);
+            if (target2.color != color) moves.add(to2);
             break;
           }
         }
@@ -164,8 +164,10 @@ List<Position> _getCannonMoves(Position from, ChessBoard board, PieceColor color
 
 List<Position> _getPawnMoves(Position from, ChessBoard board, PieceColor color) {
   final moves = <Position>[];
-  final forward = color == PieceColor.red ? 1 : -1;
-  final hasCrossed = color == PieceColor.red ? from.row >= 5 : from.row <= 4;
+  // 红方在下方(row 9)，向上走(row 减小)；黑方在上方(row 0)，向下走(row 增大)
+  final forward = color == PieceColor.red ? -1 : 1;
+  // 红方过河：row <= 4；黑方过河：row >= 5
+  final hasCrossed = color == PieceColor.red ? from.row <= 4 : from.row >= 5;
 
   // 前进
   final forwardPos = Position(from.row + forward, from.col);
@@ -227,23 +229,21 @@ bool isKingInCheck(ChessBoard board, PieceColor color) {
   final opponentColor = color == PieceColor.red ? PieceColor.black : PieceColor.red;
 
   // 检查对方将/帅对面
-  {
-    for (final entry in board.pieces.entries) {
-      if (entry.value.type == PieceType.king && entry.value.color == opponentColor) {
-        if (kingPos.col == entry.key.col) {
-          bool blocked = false;
-          final minRow = kingPos.row < entry.key.row ? kingPos.row : entry.key.row;
-          final maxRow = kingPos.row > entry.key.row ? kingPos.row : entry.key.row;
-          for (int r = minRow + 1; r < maxRow; r++) {
-            if (board.getPieceAt(Position(r, kingPos.col)) != null) {
-              blocked = true;
-              break;
-            }
+  for (final entry in board.pieces.entries) {
+    if (entry.value.type == PieceType.king && entry.value.color == opponentColor) {
+      if (kingPos.col == entry.key.col) {
+        bool blocked = false;
+        final minRow = kingPos.row < entry.key.row ? kingPos.row : entry.key.row;
+        final maxRow = kingPos.row > entry.key.row ? kingPos.row : entry.key.row;
+        for (int r = minRow + 1; r < maxRow; r++) {
+          if (board.getPieceAt(Position(r, kingPos.col)) != null) {
+            blocked = true;
+            break;
           }
-          if (!blocked) return true;
         }
-        break;
+        if (!blocked) return true;
       }
+      break;
     }
   }
 

@@ -6,17 +6,26 @@ import '../data/ai_engine.dart';
 
 enum GamePhase { playerTurn, aiThinking, gameOver }
 
+/// 记录一步棋的起止位置
+class MoveRecord {
+  final Position from;
+  final Position to;
+  const MoveRecord(this.from, this.to);
+}
+
 class GameState extends ChangeNotifier {
   ChessBoard _board = ChessBoard();
   PieceColor _playerColor = PieceColor.red;
-  int _aiDifficulty = 2; // 1=简单, 2=中等, 3=困难
+  int _aiDifficulty = 2;
   GamePhase _phase = GamePhase.playerTurn;
   Position? _selectedPiece;
   List<Position> _legalMoves = [];
   String _message = '红方先行';
   int _winCount = 0;
   int _loseCount = 0;
+  List<ChessBoard> _boardHistory = [];
   List<String> _moveHistory = [];
+  MoveRecord? _lastMove;
 
   ChessBoard get board => _board;
   PieceColor get playerColor => _playerColor;
@@ -28,6 +37,7 @@ class GameState extends ChangeNotifier {
   int get winCount => _winCount;
   int get loseCount => _loseCount;
   List<String> get moveHistory => _moveHistory;
+  MoveRecord? get lastMove => _lastMove;
 
   void selectPiece(Position pos) {
     if (_phase != GamePhase.playerTurn) return;
@@ -48,10 +58,13 @@ class GameState extends ChangeNotifier {
       return;
     }
 
-    final result = makeMove(_selectedPiece!, to, _board);
+    final from = _selectedPiece!;
+    final result = makeMove(from, to, _board);
     if (!result.isValid) return;
 
+    _boardHistory.add(_board.clone());
     _board = result.newBoard;
+    _lastMove = MoveRecord(from, to);
     _selectedPiece = null;
     _legalMoves = [];
     _moveHistory.add('player: $to');
@@ -69,18 +82,17 @@ class GameState extends ChangeNotifier {
       _message = 'AI思考中...';
     }
 
-    // AI回合
     _phase = GamePhase.aiThinking;
     notifyListeners();
 
-    Future.delayed(const Duration(milliseconds: 500), () {
+    Future.delayed(const Duration(milliseconds: 800), () {
       _aiMove();
     });
   }
 
   void _aiMove() {
     final aiColor = _playerColor == PieceColor.red ? PieceColor.black : PieceColor.red;
-    final depth = _aiDifficulty == 1 ? 2 : (_aiDifficulty == 2 ? 4 : 6);
+    final depth = _aiDifficulty == 1 ? 2 : (_aiDifficulty == 2 ? 4 : 5);
     final ai = AIEngine(maxDepth: depth);
     final bestMove = ai.findBestMove(_board, aiColor);
 
@@ -92,8 +104,10 @@ class GameState extends ChangeNotifier {
       return;
     }
 
+    _boardHistory.add(_board.clone());
     final result = makeMove(bestMove.from, bestMove.to, _board);
     _board = result.newBoard;
+    _lastMove = MoveRecord(bestMove.from, bestMove.to);
     _moveHistory.add('AI: ${bestMove.from}->${bestMove.to}'.replaceAll(RegExp(r'[()]'), ''));
     notifyListeners();
 
@@ -114,10 +128,17 @@ class GameState extends ChangeNotifier {
   }
 
   void undoMove() {
-    if (_moveHistory.length < 2 || _phase != GamePhase.playerTurn) return;
-    _moveHistory.removeLast(); // 移除AI的棋
-    _moveHistory.removeLast(); // 移除玩家的棋
-    resetGame(_moveHistory.length ~/ 2);
+    if (_boardHistory.length < 2 || _phase != GamePhase.playerTurn) return;
+    _boardHistory.removeLast();
+    _board = _boardHistory.removeLast();
+    _moveHistory.removeLast();
+    _moveHistory.removeLast();
+    _selectedPiece = null;
+    _legalMoves = [];
+    _lastMove = null;
+    _phase = GamePhase.playerTurn;
+    _message = '已悔棋，轮到你了';
+    notifyListeners();
   }
 
   void newGame() {
@@ -127,35 +148,24 @@ class GameState extends ChangeNotifier {
     _phase = GamePhase.playerTurn;
     _message = '红方先行';
     _moveHistory = [];
-    notifyListeners();
-  }
-
-  void resetGame(int movesToReplay) {
-    _board = ChessBoard();
-    _selectedPiece = null;
-    _legalMoves = [];
-    // 简化的重置方式：直接重建
-    _phase = GamePhase.playerTurn;
-    _message = '重新开始';
-    _moveHistory = [];
+    _boardHistory = [];
+    _lastMove = null;
     notifyListeners();
   }
 
   void setDifficulty(int level) {
     _aiDifficulty = level;
-    // 难度改变时重置游戏
     newGame();
   }
 
   void switchColor() {
-    // 切换玩家和AI的颜色
     _playerColor = _playerColor == PieceColor.red ? PieceColor.black : PieceColor.red;
     newGame();
     if (_playerColor == PieceColor.black) {
       _phase = GamePhase.aiThinking;
       _message = 'AI先手，思考中...';
       notifyListeners();
-      Future.delayed(const Duration(milliseconds: 300), () {
+      Future.delayed(const Duration(milliseconds: 800), () {
         _aiMove();
       });
     }

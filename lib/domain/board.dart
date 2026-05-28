@@ -8,10 +8,11 @@ class Position {
   bool isInsideBoard() => row >= 0 && row < 10 && col >= 0 && col < 9;
 
   bool isInPalace(PieceColor color) {
+    // 红方九宫格在下方(row 7-9)，黑方九宫格在上方(row 0-2)
     if (color == PieceColor.red) {
-      return col >= 3 && col <= 5 && row >= 0 && row <= 2;
-    } else {
       return col >= 3 && col <= 5 && row >= 7 && row <= 9;
+    } else {
+      return col >= 3 && col <= 5 && row >= 0 && row <= 2;
     }
   }
 
@@ -31,41 +32,41 @@ class ChessBoard {
   }
 
   void _initializeBoard() {
-    // 红方（下方，row 0-4）
-    pieces[const Position(0, 0)] = const Piece(PieceType.rook, PieceColor.red);
-    pieces[const Position(0, 1)] = const Piece(PieceType.knight, PieceColor.red);
-    pieces[const Position(0, 2)] = const Piece(PieceType.elephant, PieceColor.red);
-    pieces[const Position(0, 3)] = const Piece(PieceType.advisor, PieceColor.red);
-    pieces[const Position(0, 4)] = const Piece(PieceType.king, PieceColor.red);
-    pieces[const Position(0, 5)] = const Piece(PieceType.advisor, PieceColor.red);
-    pieces[const Position(0, 6)] = const Piece(PieceType.elephant, PieceColor.red);
-    pieces[const Position(0, 7)] = const Piece(PieceType.knight, PieceColor.red);
-    pieces[const Position(0, 8)] = const Piece(PieceType.rook, PieceColor.red);
-    pieces[const Position(2, 1)] = const Piece(PieceType.cannon, PieceColor.red);
-    pieces[const Position(2, 7)] = const Piece(PieceType.cannon, PieceColor.red);
-    pieces[const Position(3, 0)] = const Piece(PieceType.pawn, PieceColor.red);
-    pieces[const Position(3, 2)] = const Piece(PieceType.pawn, PieceColor.red);
-    pieces[const Position(3, 4)] = const Piece(PieceType.pawn, PieceColor.red);
-    pieces[const Position(3, 6)] = const Piece(PieceType.pawn, PieceColor.red);
-    pieces[const Position(3, 8)] = const Piece(PieceType.pawn, PieceColor.red);
+    // 红方（下方，row 7-9）— 玩家视角在底部
+    pieces[const Position(9, 0)] = const Piece(PieceType.rook, PieceColor.red);
+    pieces[const Position(9, 1)] = const Piece(PieceType.knight, PieceColor.red);
+    pieces[const Position(9, 2)] = const Piece(PieceType.elephant, PieceColor.red);
+    pieces[const Position(9, 3)] = const Piece(PieceType.advisor, PieceColor.red);
+    pieces[const Position(9, 4)] = const Piece(PieceType.king, PieceColor.red);
+    pieces[const Position(9, 5)] = const Piece(PieceType.advisor, PieceColor.red);
+    pieces[const Position(9, 6)] = const Piece(PieceType.elephant, PieceColor.red);
+    pieces[const Position(9, 7)] = const Piece(PieceType.knight, PieceColor.red);
+    pieces[const Position(9, 8)] = const Piece(PieceType.rook, PieceColor.red);
+    pieces[const Position(7, 1)] = const Piece(PieceType.cannon, PieceColor.red);
+    pieces[const Position(7, 7)] = const Piece(PieceType.cannon, PieceColor.red);
+    pieces[const Position(6, 0)] = const Piece(PieceType.pawn, PieceColor.red);
+    pieces[const Position(6, 2)] = const Piece(PieceType.pawn, PieceColor.red);
+    pieces[const Position(6, 4)] = const Piece(PieceType.pawn, PieceColor.red);
+    pieces[const Position(6, 6)] = const Piece(PieceType.pawn, PieceColor.red);
+    pieces[const Position(6, 8)] = const Piece(PieceType.pawn, PieceColor.red);
 
-    // 黑方（上方，row 5-9）
-    pieces[const Position(9, 0)] = const Piece(PieceType.rook, PieceColor.black);
-    pieces[const Position(9, 1)] = const Piece(PieceType.knight, PieceColor.black);
-    pieces[const Position(9, 2)] = const Piece(PieceType.elephant, PieceColor.black);
-    pieces[const Position(9, 3)] = const Piece(PieceType.advisor, PieceColor.black);
-    pieces[const Position(9, 4)] = const Piece(PieceType.king, PieceColor.black);
-    pieces[const Position(9, 5)] = const Piece(PieceType.advisor, PieceColor.black);
-    pieces[const Position(9, 6)] = const Piece(PieceType.elephant, PieceColor.black);
-    pieces[const Position(9, 7)] = const Piece(PieceType.knight, PieceColor.black);
-    pieces[const Position(9, 8)] = const Piece(PieceType.rook, PieceColor.black);
-    pieces[const Position(7, 1)] = const Piece(PieceType.cannon, PieceColor.black);
-    pieces[const Position(7, 7)] = const Piece(PieceType.cannon, PieceColor.black);
-    pieces[const Position(6, 0)] = const Piece(PieceType.pawn, PieceColor.black);
-    pieces[const Position(6, 2)] = const Piece(PieceType.pawn, PieceColor.black);
-    pieces[const Position(6, 4)] = const Piece(PieceType.pawn, PieceColor.black);
-    pieces[const Position(6, 6)] = const Piece(PieceType.pawn, PieceColor.black);
-    pieces[const Position(6, 8)] = const Piece(PieceType.pawn, PieceColor.black);
+    // 黑方（上方，row 0-2）
+    pieces[const Position(0, 0)] = const Piece(PieceType.rook, PieceColor.black);
+    pieces[const Position(0, 1)] = const Piece(PieceType.knight, PieceColor.black);
+    pieces[const Position(0, 2)] = const Piece(PieceType.elephant, PieceColor.black);
+    pieces[const Position(0, 3)] = const Piece(PieceType.advisor, PieceColor.black);
+    pieces[const Position(0, 4)] = const Piece(PieceType.king, PieceColor.black);
+    pieces[const Position(0, 5)] = const Piece(PieceType.advisor, PieceColor.black);
+    pieces[const Position(0, 6)] = const Piece(PieceType.elephant, PieceColor.black);
+    pieces[const Position(0, 7)] = const Piece(PieceType.knight, PieceColor.black);
+    pieces[const Position(0, 8)] = const Piece(PieceType.rook, PieceColor.black);
+    pieces[const Position(2, 1)] = const Piece(PieceType.cannon, PieceColor.black);
+    pieces[const Position(2, 7)] = const Piece(PieceType.cannon, PieceColor.black);
+    pieces[const Position(3, 0)] = const Piece(PieceType.pawn, PieceColor.black);
+    pieces[const Position(3, 2)] = const Piece(PieceType.pawn, PieceColor.black);
+    pieces[const Position(3, 4)] = const Piece(PieceType.pawn, PieceColor.black);
+    pieces[const Position(3, 6)] = const Piece(PieceType.pawn, PieceColor.black);
+    pieces[const Position(3, 8)] = const Piece(PieceType.pawn, PieceColor.black);
   }
 
   Piece? getPieceAt(Position pos) => pieces[pos];

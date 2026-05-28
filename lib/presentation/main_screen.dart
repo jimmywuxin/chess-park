@@ -37,7 +37,7 @@ class _MainScreenContent extends StatelessWidget {
           // 消息栏
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
             decoration: BoxDecoration(
               color: state.phase == GamePhase.aiThinking
                   ? Colors.orange.withValues(alpha: 0.3)
@@ -56,7 +56,7 @@ class _MainScreenContent extends StatelessWidget {
                 Text(
                   state.message,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: state.phase == GamePhase.gameOver
                         ? Colors.amber
@@ -66,11 +66,10 @@ class _MainScreenContent extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 8),
 
           // 比分栏
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -81,31 +80,30 @@ class _MainScreenContent extends StatelessWidget {
             ),
           ),
 
-          // 棋盘
+          // 棋盘 — Expanded 让它填满剩余空间，LayoutBuilder 负责自适应
           Expanded(
             child: Center(
-              child: SingleChildScrollView(
-                child: ChessBoardWidget(
-                  board: state.board,
-                  selectedPiece: state.selectedPiece,
-                  legalMoves: state.legalMoves,
-                  playerIsRed: state.playerColor == PieceColor.red,
-                  onTap: (pos) {
-                    final piece = state.board.getPieceAt(pos);
-                    if (piece != null && piece.color == state.playerColor) {
-                      state.selectPiece(pos);
-                    } else if (state.selectedPiece != null) {
-                      state.moveTo(pos);
-                    }
-                  },
-                ),
+              child: ChessBoardWidget(
+                board: state.board,
+                selectedPiece: state.selectedPiece,
+                legalMoves: state.legalMoves,
+                playerIsRed: state.playerColor == PieceColor.red,
+                lastMove: state.lastMove,
+                onTap: (pos) {
+                  final piece = state.board.getPieceAt(pos);
+                  if (piece != null && piece.color == state.playerColor) {
+                    state.selectPiece(pos);
+                  } else if (state.selectedPiece != null) {
+                    state.moveTo(pos);
+                  }
+                },
               ),
             ),
           ),
 
           // 控制按钮栏
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             decoration: BoxDecoration(
               color: const Color(0xFF3D2B00),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -131,7 +129,7 @@ class _MainScreenContent extends StatelessWidget {
 
   Widget _buildScoreChip(String label, int count, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
@@ -139,7 +137,7 @@ class _MainScreenContent extends StatelessWidget {
       ),
       child: Text(
         '$label: $count',
-        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13),
       ),
     );
   }
